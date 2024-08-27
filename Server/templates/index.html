@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Image Feed</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <h1>Real-Time Image Feed</h1>
+    <img id="image" src="/image" alt="Real-time Image" />
+    <button id="capture-text">Get Captured Text</button>
+    <p id="captured-text"></p>
+
+    <h2>Votes</h2>
+    <table id="votes-table">
+        <thead>
+            <tr>
+                <th>Vote Name</th>
+                <th>Vote Party</th>
+                <th>Vote Count</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Rows will be added here by JavaScript -->
+        </tbody>
+    </table>
+
+    <h2>Already Voted</h2>
+    <table id="already-voted-table">
+        <thead>
+            <tr>
+                <th>CNP</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Rows will be added here by JavaScript -->
+        </tbody>
+    </table>
+
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+
+        socket.on('image_update', () => {
+            const img = document.getElementById('image');
+            img.src = '/image?time=' + new Date().getTime();  // Bypass cache by appending timestamp
+        });
+
+        document.getElementById('capture-text').addEventListener('click', () => {
+            fetch('/capture')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Received data:', data);  // Log data for debugging
+                    if (data.captured_text) {
+                        document.getElementById('captured-text').innerText = data.captured_text;
+                    } else {
+                        document.getElementById('captured-text').innerText = 'No text captured';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching captured text:', error);
+                });
+        });
+
+        function loadVotes() {
+            fetch('/get-votes')
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.querySelector('#votes-table tbody');
+                    tableBody.innerHTML = '';  // Clear existing rows
+
+                    data.forEach(vote => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${vote.voteName}</td>
+                            <td>${vote.voteParty}</td>
+                            <td>${vote.count}</td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching votes:', error);
+                });
+        }
+
+        function loadAlreadyVoted() {
+            fetch('/already-voted')
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.querySelector('#already-voted-table tbody');
+                    tableBody.innerHTML = '';  // Clear existing rows
+
+                    data.forEach(voter => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${voter.cnp}</td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching already voted:', error);
+                });
+        }
+
+        // Load votes and already voted data on page load
+        loadVotes();
+        loadAlreadyVoted();
+
+        // Optionally, you can set up periodic refreshes
+        setInterval(loadVotes, 5000);  // Refresh votes every 5 seconds
+        setInterval(loadAlreadyVoted, 5000);  // Refresh already voted every 5 seconds
+
+    </script>
+</body>
+</html>
