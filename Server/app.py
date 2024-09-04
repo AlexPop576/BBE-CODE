@@ -12,9 +12,10 @@ from flask_cors import CORS
 import pytesseract
 from io import BytesIO
 from picamera2 import Picamera2
+import os
 
 # Define paths
-image_path = "captured_image.jpg"
+image_path = "captured_image123.jpg"
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})  # Allow all origins
@@ -86,16 +87,40 @@ def capture_image():
         except Exception as e:
             print(f"Error capturing image: {e}")
 
+from PIL import Image
+import numpy as np
+import pytesseract
+
 def capture_id():
     global captured_text
     try:
+        # Capture the image array from the camera
         image_array = picam2.capture_array()
+        
         if image_array is not None:
+            # Convert the NumPy array to a PIL Image
             image = Image.fromarray(image_array)
+            image = image.convert('RGB')  # Convert to RGB mode
+            
+            # Get the dimensions of the image
+            width, height = image.size
+            
+            # Define the cropping box for the left half of the image
+            left_half_box = (0, 0, width // 2, height)
+            
+            # Crop the image to the left half
+            image = image.crop(left_half_box)
+            
+            # Save the cropped image
+            image.save(image_path, 'JPEG')
+            
+            # Extract text using OCR
             captured_text = pytesseract.image_to_string(image)
+    
     except Exception as e:
         print(f"Error in capture_id: {e}")
         captured_text = None
+
 
 @app.route('/')
 def index():
@@ -148,6 +173,19 @@ def stop_camera():
         cameraStarted = False
         print("Camera stopped")
     return "Camera stopped"
+
+@app.route('/saved-image')
+def get_saved_image():
+    try:
+        # Check if the file exists
+        if os.path.exists(image_path):
+            return send_file(image_path, mimetype='image/jpeg')
+        else:
+            return "Image not found", 404
+    except Exception as e:
+        print(f"Error serving image: {e}")
+        return "Internal Server Error", 500
+
 
 @app.route('/receive-data', methods=['POST'])
 def receive_data():
