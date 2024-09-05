@@ -16,6 +16,7 @@ import os
 
 # Define paths
 image_path = "captured_image123.jpg"
+owfs_path = '/mnt/1wire/'
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})  # Allow all origins
@@ -238,61 +239,50 @@ def receive_ibutton_data():
     else:
         return jsonify({"status": "error", "message": "No iButton ID received"}), 400
 
+# Flag to indicate if the server should keep listening for iButton
+listening = False
+ibutton_detected = False
+
 @app.route('/help-listen')
 def start_listening():
-    return "Started listening"
+    global listening, ibutton_detected
+    listening = True
+    ibutton_detected = False
 
-def find_device():
-    global device
-    with usb_lock:
-        device = usb.core.find(idVendor=VENDOR_ID, idProduct=PRODUCT_ID)
-        if device is None:
-            raise ValueError('Device not found')
+    # Start a new thread to listen for the iButton
+    thread = threading.Thread(target=listen_for_ibutton)
+    thread.start()
 
-def setup_device():
-    global device
-    if device is None:
-        find_device()
-    device.set_configuration()
-    usb.util.claim_interface(device, 0)
+    return jsonify({"status": "Started listening for iButton."})
 
-@app.route('/connect-usb', methods=['GET'])
-def connect_usb():
-    try:
-        setup_device()
-        return jsonify({"status": "Device connected"})
-    except Exception as e:
-        logging.error(f"Error connecting to USB device: {e}")
-        return jsonify({"status": "error", "message": str(e)})
+@app.route('/ibutton-status')
+def ibutton_status():
+    global ibutton_detected
+    return jsonify({"detected": ibutton_detected})
 
-@app.route('/read-usb', methods=['GET'])
-def read_usb():
-    global device
-    if device is None:
-        return jsonify({"status": "error", "message": "Device not connected"})
-    try:
-        # Replace with appropriate endpoint and length
-        endpoint = 0x81  # Replace with your endpoint address
-        length = 64
-        data = device.read(endpoint, length)
-        return jsonify({"status": "success", "data": data.hex()})
-    except Exception as e:
-        logging.error(f"Error reading from USB device: {e}")
-        return jsonify({"status": "error", "message": str(e)})
+def listen_for_ibutton():
+    global listening, ibutton_detected
 
-@app.route('/disconnect-usb', methods=['GET'])
-def disconnect_usb():
-    global device
-    if device is None:
-        return jsonify({"status": "error", "message": "Device not connected"})
-    try:
-        usb.util.release_interface(device, 0)
-        usb.util.dispose_resources(device)
-        device = None
-        return jsonify({"status": "Device disconnected"})
-    except Exception as e:
-        logging.error(f"Error disconnecting USB device: {e}")
-        return jsonify({"status": "error", "message": str(e)})
+    while listening:
+        if check_ibutton_presence():
+            ibutton_detected = True
+            listening = False  # Stop listening once iButton is detected
+            break
+
+        time.sleep(1)
+
+def check_ibutton_presence():
+    owfs_path = '/mnt/1wire/'  # Define your OWFS path here
+    devices = os.listdir(owfs_path)
+    ibuttons = [dev for dev in devices if dev.startswith('0C.') or dev.startswith('24.') or dev.startswith('01.') or dev.startswith('2D.')]
+
+    if ibuttons:
+        print(f"iButton detected: {ibuttons}")
+        return True
+    else:
+        print("No iButton detected.")
+        return False
+
 
 @socketio.on('connect')
 def handle_connect():
