@@ -5,65 +5,152 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Real-Time Image Feed</title>
     <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        /* Main Page Styling */
+        #main-page {
+            display: none;  /* Initially hidden */
+        }
+        #yellow-page {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #FFD700; /* Set yellow background with #FFD700 */
+            flex-direction: column;
+        }
+        #title-vote{
+            color: white;
+        }
         table {
-            width: 100%;
+            width: 80%;
             border-collapse: collapse;
-            margin-bottom: 20px;
+            margin: 20px 0;
+            background-color: white;
+            border-radius: 5px;
+            overflow: hidden;
         }
         table, th, td {
-            border: 1px solid black;
+            border: 1px solid white; /* White borders for a clean look */
         }
         th, td {
-            padding: 8px;
+            padding: 12px;
             text-align: left;
+            background-color: #f2f2f2; /* Light gray background for cells */
         }
-        #cropped-image, #saved-image {
-            margin-top: 20px;
+        th {
+            background-color: #555; /* Dark header for table */
+            color: white;
+        }
+        #toggle-button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
-    <h1>Real-Time Image Feed</h1>
-    <img id="image" src="/image" alt="Real-time Image" />
-    <button id="capture-text">Get Captured Text</button>
-    <p id="captured-text"></p>
-    
-    <button id="get-cropped-photo">Get Cropped Photo</button>
-    <img id="cropped-image" src="" alt="Cropped Image" style="display: none;" />
+    <!-- Yellow Page Content -->
+    <div id="yellow-page">
+        <h1 id="title-vote"><b>Vote Panel</b></h1>
 
-    <button id="get-saved-photo">Get Saved Photo</button>
-    <img id="saved-image" src="" alt="Saved Image" style="display: none;" />
+        <!-- Votes Table -->
+        <table id="yellow-votes-table">
+            <thead>
+                <tr>
+                    <th>Vote Name</th>
+                    <th>Vote Party</th>
+                    <th>Vote Count</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Rows will be added by JavaScript -->
+            </tbody>
+        </table>
 
-    <h2>Votes</h2>
-    <table id="votes-table">
-        <thead>
-            <tr>
-                <th>Vote Name</th>
-                <th>Vote Party</th>
-                <th>Vote Count</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Rows will be added here by JavaScript -->
-        </tbody>
-    </table>
+        <!-- CNP Table -->
+        <table id="yellow-cnp-table">
+            <thead>
+                <tr>
+                    <th>CNP</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Rows will be added by JavaScript -->
+            </tbody>
+        </table>
 
-    <h2>Already Voted</h2>
-    <table id="already-voted-table">
-        <thead>
-            <tr>
-                <th>CNP</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Rows will be added here by JavaScript -->
-        </tbody>
-    </table>
+        <button id="toggle-button">Switch to Main Page</button>
+    </div>
+
+    <!-- Main Page Content -->
+    <div id="main-page">
+        <h1>Real-Time Image Feed</h1>
+        <img id="image" src="/image" alt="Real-time Image" />
+        <button id="capture-text">Get Captured Text</button>
+        <p id="captured-text"></p>
+
+        <button id="get-cropped-photo">Get Cropped Photo</button>
+        <img id="cropped-image" src="" alt="Cropped Image" style="display: none;" />
+
+        <button id="get-saved-photo">Get Saved Photo</button>
+        <img id="saved-image" src="" alt="Saved Image" style="display: none;" />
+
+        <h2>Votes</h2>
+        <table id="votes-table">
+            <thead>
+                <tr>
+                    <th>Vote Name</th>
+                    <th>Vote Party</th>
+                    <th>Vote Count</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Rows will be added here by JavaScript -->
+            </tbody>
+        </table>
+
+        <h2>Already Voted</h2>
+        <table id="already-voted-table">
+            <thead>
+                <tr>
+                    <th>CNP</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Rows will be added here by JavaScript -->
+            </tbody>
+        </table>
+    </div>
 
     <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
     <script>
         const socket = io();
 
+        // Toggle button functionality to switch between pages
+        document.getElementById('toggle-button').addEventListener('click', () => {
+            const yellowPage = document.getElementById('yellow-page');
+            const mainPage = document.getElementById('main-page');
+            
+            // Toggle visibility of the yellow page and main page
+            if (yellowPage.style.display === 'none') {
+                yellowPage.style.display = 'flex';
+                mainPage.style.display = 'none';
+                document.getElementById('toggle-button').innerText = 'Switch to Main Page';
+            } else {
+                yellowPage.style.display = 'none';
+                mainPage.style.display = 'block';
+            }
+        });
+
+        // Initially show the yellow page and hide the main page
+        document.getElementById('yellow-page').style.display = 'flex';
+        document.getElementById('main-page').style.display = 'none';
+
+        // Socket event to update image
         socket.on('image_update', () => {
             const img = document.getElementById('image');
             img.src = '/image?time=' + new Date().getTime();  // Bypass cache by appending timestamp
@@ -73,7 +160,6 @@
             fetch('/capture')
                 .then(response => response.json())
                 .then(data => {
-                    console.log('Received data:', data);  // Log data for debugging
                     if (data.captured_text) {
                         document.getElementById('captured-text').innerText = data.captured_text;
                     } else {
@@ -88,11 +174,8 @@
         document.getElementById('get-cropped-photo').addEventListener('click', () => {
             fetch('/get-cropped-photo')
                 .then(response => {
-                    if (response.ok) {
-                        return response.blob();  // Get the image as a Blob
-                    } else {
-                        throw new Error('Image not found');
-                    }
+                    if (response.ok) return response.blob();  // Get the image as a Blob
+                    else throw new Error('Image not found');
                 })
                 .then(blob => {
                     const imgElement = document.getElementById('cropped-image');
@@ -107,11 +190,8 @@
         document.getElementById('get-saved-photo').addEventListener('click', () => {
             fetch('/saved-image')
                 .then(response => {
-                    if (response.ok) {
-                        return response.blob();  // Get the image as a Blob
-                    } else {
-                        throw new Error('Image not found');
-                    }
+                    if (response.ok) return response.blob();  // Get the image as a Blob
+                    else throw new Error('Image not found');
                 })
                 .then(blob => {
                     const imgElement = document.getElementById('saved-image');
@@ -127,17 +207,28 @@
             fetch('/get-votes')
                 .then(response => response.json())
                 .then(data => {
-                    const tableBody = document.querySelector('#votes-table tbody');
-                    tableBody.innerHTML = '';  // Clear existing rows
+                    const tableBodyMain = document.querySelector('#votes-table tbody');
+                    const tableBodyYellow = document.querySelector('#yellow-votes-table tbody');
+                    tableBodyMain.innerHTML = '';  // Clear existing rows
+                    tableBodyYellow.innerHTML = '';  // Clear yellow page's table
 
                     data.forEach(vote => {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
+                        const rowMain = document.createElement('tr');
+                        const rowYellow = document.createElement('tr');
+
+                        rowMain.innerHTML = `
                             <td>${vote.voteName}</td>
                             <td>${vote.voteParty}</td>
                             <td>${vote.count}</td>
                         `;
-                        tableBody.appendChild(row);
+                        rowYellow.innerHTML = `
+                            <td>${vote.voteName}</td>
+                            <td>${vote.voteParty}</td>
+                            <td>${vote.count}</td>
+                        `;
+
+                        tableBodyMain.appendChild(rowMain);
+                        tableBodyYellow.appendChild(rowYellow);
                     });
                 })
                 .catch(error => {
@@ -149,15 +240,20 @@
             fetch('/already-voted')
                 .then(response => response.json())
                 .then(data => {
-                    const tableBody = document.querySelector('#already-voted-table tbody');
-                    tableBody.innerHTML = '';  // Clear existing rows
+                    const tableBodyMain = document.querySelector('#already-voted-table tbody');
+                    const tableBodyYellow = document.querySelector('#yellow-cnp-table tbody');
+                    tableBodyMain.innerHTML = '';  // Clear existing rows
+                    tableBodyYellow.innerHTML = '';  // Clear yellow page's table
 
                     data.forEach(voter => {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td>${voter.cnp}</td>
-                        `;
-                        tableBody.appendChild(row);
+                        const rowMain = document.createElement('tr');
+                        const rowYellow = document.createElement('tr');
+
+                        rowMain.innerHTML = `<td>${voter.cnp}</td>`;
+                        rowYellow.innerHTML = `<td>${voter.cnp}</td>`;
+
+                        tableBodyMain.appendChild(rowMain);
+                        tableBodyYellow.appendChild(rowYellow);
                     });
                 })
                 .catch(error => {
@@ -171,8 +267,7 @@
 
         // Optionally, you can set up periodic refreshes
         setInterval(loadVotes, 5000);  // Refresh votes every 5 seconds
-        setInterval(loadAlreadyVoted, 5000);  // Refresh already voted every 5 seconds
-
+        setInterval(loadAlreadyVoted, 5000);  // Refresh
     </script>
 </body>
 </html>
